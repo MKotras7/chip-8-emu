@@ -3,6 +3,8 @@
 #include<string.h>
 #include<ncurses.h>
 #include<time.h>
+#include "instructions.c"
+
 //Data storage
 unsigned char memory[4096];
 unsigned short stack[16];
@@ -24,7 +26,7 @@ unsigned char vD;
 unsigned char vE;
 unsigned char vF;
 //Special register I
-unsigned short i;
+unsigned short instructionRegister;
 //Timer registers
 unsigned char delayTimer;
 unsigned char soundTimer;
@@ -56,10 +58,12 @@ unsigned char keyToKeypad(char c)
 	}
 }
 
+/*
 unsigned short getInstruction(short pc)
 {
 	return (((short)memory[pc]) << 8) + (short)memory[pc+1];
 }
+*/
 
 unsigned short getLower12bit(short value)
 {
@@ -240,7 +244,7 @@ int main(int argc, char *argv[])
 	
 	memset(stack, 0, 16);
 	v0 = v1 = v2 = v3 = v4 = v5 = v6 = v7 = v8 = v9 = vA = vB = vC = vD = vE = vF = 0;
-	i = 0;
+	instructionRegister = 0;
 	delayTimer = soundTimer = 0;
 	pc = 0;
 	sp = 0;
@@ -287,7 +291,402 @@ int main(int argc, char *argv[])
 			lastTime = newTime;
 		}
 		
-		unsigned short instruction = getInstruction(pc);
+		//unsigned short instruction = getInstruction(pc);
+		union Instruction instruction = getInstruction(pc, memory);
+		
+		//{CLS, RET, JPADDR, CALLADDR, SEVXBYTE, SNEVXBYTE, SEVXVY, LDVXBYTE, ADDVXBYTE, LDVXVY, ORVXVY, ANDVXVY, XORVXVY, ADDVXVY, SUBVXVY, SHRVXVY, SUBNVXVY, SHLVXVY, SNEVXVY, LDIADDR, JPV0ADDR, RNDVXBYTE, DRWVXVYNIBBLE, SKPVX, SKNPVX, LDVXDT, LDVXK, LDDTVX, LDSTVX, ADDIVX, LDFVX, LDBVX, LDIVX, LDVXI, NOP}
+		switch(decode(instruction))
+		{
+			case CLS:
+			{
+				erase();
+				break;
+			}
+			case RET:
+			{
+				unsigned short topOfStack = stack[sp];
+				sp--;
+				pc = topOfStack;
+				break;
+			}
+			case JPADDR:
+			{
+				pc = instruction.bottom12Bits;
+				incrementPC = 0;
+				break;
+			}
+			case CALLADDR:
+			{
+				sp++;
+				stack[sp] = pc;
+				pc = instruction.bottom12Bits;
+				incrementPC = 0;
+				break;
+			}
+			case SEVXBYTE:
+			{
+				unsigned char kk = instruction.lowByte;
+				unsigned char x = instruction.nibble2;
+				unsigned char *vXptr = getRegister(x);
+				if(*vXptr == kk)
+				{
+					pc+=2;
+				}
+				break;
+			}
+			case SNEVXBYTE:
+			{
+				unsigned char kk = instruction.lowByte;
+				unsigned char x = instruction.nibble2;
+				unsigned char *vXptr = getRegister(x);
+				if(*vXptr != kk)
+				{
+					pc+=2;
+				}
+				break;
+			}
+			case SEVXVY:
+			{
+				unsigned char x = instruction.nibble2;
+				unsigned char *vXptr = getRegister(x);
+				
+				unsigned char y = instruction.nibble1;
+				unsigned char *vYptr = getRegister(y);
+				
+				if(*vXptr != *vYptr)
+				{
+					pc+=2;
+				}
+				break;
+			}
+			case LDVXBYTE:
+			{
+				//printf("LD Vx, byte");
+				unsigned char x = instruction.nibble2;
+				unsigned char *vXptr = getRegister(x);
+				unsigned char kk = instruction.lowByte;
+				*vXptr = kk;
+				
+				//printf("LD V%x 0x%02X", x, kk);
+				break;
+			}
+			case ADDVXBYTE:
+			{
+				//printf("ADD Vx, byte");
+				unsigned char x = instruction.nibble2;
+				unsigned char *vXptr = getRegister(x);
+				unsigned char kk = instruction.lowByte;
+				//printf("ADD V%x 0x%02X", x, kk);
+				*vXptr += kk;
+				break;
+			}
+			case LDVXVY:
+			{
+				//printf("LD Vx, Vy");
+				unsigned char x = instruction.nibble2;
+				unsigned char *vXptr = getRegister(x);
+				
+				unsigned char y = instruction.nibble1;
+				unsigned char *vYptr = getRegister(y);
+				
+				*vXptr = *vYptr;
+				
+				//printf("LD V%x, V%x", x, y);
+				break;
+			}
+			case ORVXVY:
+			{
+				//printf("OR Vx, Vy");
+				unsigned char x = instruction.nibble2;
+				unsigned char *vXptr = getRegister(x);
+				
+				unsigned char y = instruction.nibble1;
+				unsigned char *vYptr = getRegister(y);
+				
+				*vXptr |= *vYptr;
+				
+				//printf("OR V%x, V%x", x, y);
+				break;
+			}
+			case ANDVXVY:
+			{
+				//printf("AND Vx, Vy");
+				unsigned char x = instruction.nibble2;
+				unsigned char *vXptr = getRegister(x);
+				
+				unsigned char y = instruction.nibble1;
+				unsigned char *vYptr = getRegister(y);
+				
+				*vXptr &= *vYptr;
+				
+				//printf("AND V%x, V%x", x, y);
+				break;
+			}
+			case XORVXVY:
+			{
+				//printf("XOR Vx, Vy");
+				unsigned char x = instruction.nibble2;
+				unsigned char *vXptr = getRegister(x);
+				
+				unsigned char y = instruction.nibble1;
+				unsigned char *vYptr = getRegister(y);
+				
+				*vXptr ^= *vYptr;
+				
+				//printf("XOR V%x, V%x", x, y);
+				break;
+			}
+			case ADDVXVY:
+			{
+				//printf("ADD Vx, Vy");
+				unsigned char x = instruction.nibble2;
+				unsigned char *vXptr = getRegister(x);
+				
+				unsigned char y = instruction.nibble1;
+				unsigned char *vYptr = getRegister(y);
+				
+				//Check for overflow
+				int result = (int)*vXptr + (int)*vYptr;
+				vF = result > 0xFF;
+				
+				*vXptr += *vYptr;
+				//printf("ADD V%x, V%x", x, y);
+				break;
+			}
+			case SUBVXVY:
+			{
+				//printf("SUB Vx, Vy");
+				unsigned char x = instruction.nibble2;
+				unsigned char *vXptr = getRegister(x);
+				
+				unsigned char y = instruction.nibble1;
+				unsigned char *vYptr = getRegister(y);
+				
+				vF = *vXptr > *vYptr;
+				*vXptr -= *vYptr;
+				//printf("SUB V%x, V%x", x, y);
+				break;
+			}
+			case SHRVXVY:
+			{
+				//printf("SHR Vx {, Vy}");
+				unsigned char x = instruction.nibble2;
+				unsigned char *vXptr = getRegister(x);
+				//set lsb == 1
+				vF = ((*vXptr) & 1) == 1;
+				*vXptr >>= 1;
+				//printf("SHR V%x", x);
+				break;
+			}
+			case SUBNVXVY:
+			{
+				//printf("SUBN Vx, Vy");
+				unsigned char x = instruction.nibble2;
+				unsigned char *vXptr = getRegister(x);
+				
+				unsigned char y = instruction.nibble1;
+				unsigned char *vYptr = getRegister(y);
+				vF = *vYptr > *vXptr;
+				*vXptr -= *vYptr;
+				//printf("SUBN V%x, V%x", x, y);
+				break;
+			}
+			case SHLVXVY:
+			{
+				//printf("SHL Vx {, Vy}");
+				unsigned char x = instruction.nibble2;
+				unsigned char *vXptr = getRegister(x);
+				//set msb == 1
+				vF = (*vXptr & 0x8000) == 0x8000;
+				//vX *= 2
+				*vXptr <<= 1;
+				//printf("SHL V%x {, Vy}", x);
+				break;
+			}
+			case SNEVXVY:
+			{
+				//printf("SNE Vx, Vy");
+				unsigned char x = instruction.nibble2;
+				unsigned char *vXptr = getRegister(x);
+				
+				unsigned char y = instruction.nibble1;
+				unsigned char *vYptr = getRegister(y);
+				if((*vXptr) != (*vYptr))
+				{
+					pc += 2;
+				}
+				//printf("SNE V%x, V%x", x, y);
+				break;
+			}
+			case LDIADDR:
+			{
+				//printf("LD I, addr");
+				unsigned short address = instruction.bottom12Bits;
+				//printf("LD I=0x%01X->0x%03X", i, address); 
+				instructionRegister = address;
+				//printf("LD I, 0x%03X", address);
+				break;
+			}
+			case JPV0ADDR:
+			{
+				short address = instruction.bottom12Bits;
+				pc = address + v0;
+				
+				incrementPC = 0;
+				break;
+			}
+			case RNDVXBYTE:
+			{
+				unsigned char x = instruction.nibble2;
+				unsigned char *vXptr = getRegister(x);
+				unsigned char randomValue = (unsigned char)rand();
+				unsigned char kk = instruction.lowByte;
+				*vXptr = randomValue & kk;
+				break;
+			}
+			case DRWVXVYNIBBLE:
+			{
+				unsigned char x = instruction.nibble2;
+				unsigned char *vXptr = getRegister(x);
+				
+				unsigned char y = instruction.nibble1;
+				unsigned char *vYptr = getRegister(y);
+				
+				unsigned char n = instruction.nibble0;
+				unsigned char startX = *vXptr;
+				unsigned char startY = *vYptr;
+				int anyChanged = 0;
+				for(int j = 0; j < n; j++) //Sprite line number
+				{
+					unsigned char spriteLine = memory[instructionRegister+j];
+					for(int k = 7; k >= 0; k--)
+					{
+						int oldEnabled = (inch() & A_REVERSE) == A_REVERSE;
+						int flipBit = (spriteLine&1);
+						int newShouldBeEnabled = oldEnabled ^ flipBit;
+						
+						//If spriteLine&1 == 1 that means we are changing the pixel
+						//Also, if newShouldBeEnabled == 0 that means we erased a pixel.
+						//In this case, we should set anyChanged to true. and also
+						//at the end, we set VF to 1
+						if( ((flipBit)==1) && (newShouldBeEnabled==0))
+						{ //This can probably be a 1 line |= statement
+							anyChanged = 1;
+						}
+						if(flipBit)
+						{ 
+							move( (startY + j) % 32, (startX + k) % 64);
+							addch(' ' | A_REVERSE);
+						}
+						
+						spriteLine >>= 1;
+					}
+				}
+				refresh();
+				vF = anyChanged;
+				break;
+			}
+			case SKPVX:
+			{
+				timeout(0);
+				unsigned char key = (unsigned char) getch();
+				
+				unsigned char x = instruction.nibble2;
+				unsigned char *vXptr = getRegister(x);
+				if(key == *vXptr)
+				{
+					pc += 2;
+				}
+				break;
+			}
+			case SKNPVX:
+			{
+				timeout(0);
+				unsigned char key = (unsigned char) getch();
+				
+				unsigned char x = instruction.nibble2;
+				unsigned char *vXptr = getRegister(x);
+				if(key != *vXptr)
+				{
+					pc += 2;
+				}
+				break;
+			}
+			case LDVXDT:
+			{
+				unsigned char x = instruction.nibble2;
+				unsigned char *vXptr = getRegister(x);
+				*vXptr = delayTimer;
+				break;
+			}
+			case LDVXK:
+			{
+				notimeout(win, 1);
+				char key = (char) getch();
+				//unsigned char key = 0;
+				unsigned char x = instruction.nibble2;
+				unsigned char *vXptr = getRegister(x);
+				
+				*vXptr = keyToKeypad(key);
+				break;
+			}
+			case LDDTVX:
+			{
+				unsigned char x = instruction.nibble2;
+				unsigned char *vXptr = getRegister(x);
+				delayTimer = *vXptr;
+				break;
+			}
+			case LDSTVX:
+			{
+				unsigned char x = instruction.nibble2;
+				unsigned char *vXptr = getRegister(x);
+				soundTimer = *vXptr;
+				break;
+			}
+			case LDFVX:
+			{
+				unsigned char x = instruction.nibble2;
+				unsigned char *vXptr = getRegister(x);
+				instructionRegister = 5 * (*vXptr);
+				break;
+			}
+			case LDBVX:
+			{
+				unsigned char x = instruction.nibble2;
+				unsigned char *vXptr = getRegister(x);
+				memory[instructionRegister  ] = ((*vXptr) / 100) % 10;
+				memory[instructionRegister+1] = ((*vXptr) / 10 ) % 10;
+				memory[instructionRegister+2] = ((*vXptr)      ) % 10;
+				break;
+			}
+			case LDIVX:
+			{
+				unsigned char x = instruction.nibble2;
+				//unsigned char *registerPointer1 = getRegister(registerValue1);
+				for(int iterator = 0; iterator <= x; iterator++)
+				{
+					unsigned char *registerPointer = getRegister(iterator);
+					memory[instructionRegister + iterator] = *registerPointer;
+				}
+				break;
+			}
+			case LDVXI:
+			{
+				unsigned char x = instruction.nibble2;
+				for(int j = 0; j <= x; j++)
+				{
+					unsigned char *registerPointer = getRegister(j);
+					*registerPointer = memory[instructionRegister+j];
+				}
+				break;
+			}
+			case NOP:
+			{
+				break;
+			}
+		}
+		
 		//printf("PC: 0x%03X Instruction: 0x%04X: \n", pc, instruction);
 		/*
 		if((instruction & 0xF000) == 0x0000)
@@ -295,7 +694,8 @@ int main(int argc, char *argv[])
 			printf("SYS addr");
 			//This is ignored by modern interpreters according to Cowgod's Chip-8 Technical Reference
 		}
-		else */ if(instruction == 0x00E0)
+		else */ 
+		/* if(instruction == 0x00E0)
 		{
 			//printf("CLS");
 			erase();
@@ -519,7 +919,7 @@ int main(int argc, char *argv[])
 			//printf("LD I, addr");
 			short address = getLower12bit(instruction);
 			//printf("LD I=0x%01X->0x%03X", i, address); 
-			i = address;
+			instructionRegister = address;
 			//printf("LD I, 0x%03X", address);
 		}
 		else if((instruction & 0xF000) == 0xB000)
@@ -557,7 +957,7 @@ int main(int argc, char *argv[])
 			int anyChanged = 0;
 			for(int j = 0; j < n; j++) //Sprite line number
 			{
-				unsigned char spriteLine = memory[i+j];
+				unsigned char spriteLine = memory[instructionRegister+j];
 				for(int k = 7; k >= 0; k--)
 				{
 					
@@ -657,7 +1057,7 @@ int main(int argc, char *argv[])
 			//printf("ADD I, Vx");
 			unsigned char x = getNibble(instruction, 2);
 			unsigned char *vXptr = getRegister(x);
-			i = i + *vXptr;
+			instructionRegister += *vXptr;
 			//printf("ADD I, V%x", x);
 		}
 		else if((instruction & 0xF0FF) == 0xF029)
@@ -665,7 +1065,7 @@ int main(int argc, char *argv[])
 			//printf("LD F, Vx");
 			unsigned char x = getNibble(instruction, 2);
 			unsigned char *vXptr = getRegister(x);
-			i = 5 * (*vXptr);
+			instructionRegister = 5 * (*vXptr);
 			//Display
 		}
 		else if((instruction & 0xF0FF) == 0xF033)
@@ -673,9 +1073,9 @@ int main(int argc, char *argv[])
 			//printf("LD B, Vx");
 			unsigned char x = getNibble(instruction, 2);
 			unsigned char *vXptr = getRegister(x);
-			memory[i  ] = ((*vXptr) / 100) % 10;
-			memory[i+1] = ((*vXptr) / 10 ) % 10;
-			memory[i+2] = ((*vXptr)      ) % 10;
+			memory[instructionRegister  ] = ((*vXptr) / 100) % 10;
+			memory[instructionRegister+1] = ((*vXptr) / 10 ) % 10;
+			memory[instructionRegister+2] = ((*vXptr)      ) % 10;
 			//printf("LD B, V%x", x);
 		}
 		else if((instruction & 0xF0FF) == 0xF055)
@@ -686,7 +1086,7 @@ int main(int argc, char *argv[])
 			for(int iterator = 0; iterator <= x; iterator++)
 			{
 				unsigned char *registerPointer = getRegister(iterator);
-				memory[i + iterator] = *registerPointer;
+				memory[instructionRegister + iterator] = *registerPointer;
 			}
 			//printf("LD [I], V%x", x);
 		}
@@ -697,7 +1097,7 @@ int main(int argc, char *argv[])
 			for(int j = 0; j <= x; j++)
 			{
 				unsigned char *registerPointer = getRegister(j);
-				*registerPointer = memory[i+j];
+				*registerPointer = memory[instructionRegister+j];
 			}
 			//printf("LD V%x, [I]", x);
 		}
@@ -705,10 +1105,12 @@ int main(int argc, char *argv[])
 		{
 			//printf("nop");
 		}
+		*/
+		
 		//printf("\n");
 		if(incrementPC)
 		{
-			pc+=2;	
+			pc+=2;
 		}
 		incrementPC = 1;
 	}
