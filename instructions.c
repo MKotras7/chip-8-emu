@@ -1,4 +1,7 @@
-enum opcode {CLS, RET, JPADDR, CALLADDR, SEVXBYTE, SNEVXBYTE, SEVXVY, LDVXBYTE, ADDVXBYTE, LDVXVY, ORVXVY, ANDVXVY, XORVXVY, ADDVXVY, SUBVXVY, SHRVXVY, SUBNVXVY, SHLVXVY, SNEVXVY, LDIADDR, JPV0ADDR, RNDVXBYTE, DRWVXVYNIBBLE, SKPVX, SKNPVX, LDVXDT, LDVXK, LDDTVX, LDSTVX, ADDIVX, LDFVX, LDBVX, LDIVX, LDVXI, NOP};
+#include <string.h>
+#include <stdio.h>
+
+enum Opcode {CLS, RET, JPADDR, CALLADDR, SEVXBYTE, SNEVXBYTE, SEVXVY, LDVXBYTE, ADDVXBYTE, LDVXVY, ORVXVY, ANDVXVY, XORVXVY, ADDVXVY, SUBVXVY, SHRVXVY, SUBNVXVY, SHLVXVY, SNEVXVY, LDIADDR, JPV0ADDR, RNDVXBYTE, DRWVXVYNIBBLE, SKPVX, SKNPVX, LDVXDT, LDVXK, LDDTVX, LDSTVX, ADDIVX, LDFVX, LDBVX, LDIVX, LDVXI, NOP};
 
 union Instruction
 {
@@ -25,7 +28,7 @@ union Instruction getInstruction(unsigned short pc, char memory[])
 	return instruction;
 }
 
-enum opcode decode(union Instruction instruction)
+enum Opcode decode(union Instruction instruction)
 {
 	switch(instruction.nibble3)
 	{
@@ -33,6 +36,7 @@ enum opcode decode(union Instruction instruction)
 			{
 				case 0xE0: return CLS;
 				case 0xEE: return RET;
+				default: return NOP;
 			}
 		case 0x1: return JPADDR;
 		case 0x2: return CALLADDR;
@@ -52,6 +56,7 @@ enum opcode decode(union Instruction instruction)
 				case 0x6: return SHRVXVY;
 				case 0x7: return SUBNVXVY;
 				case 0xE: return SHLVXVY;
+				default: return NOP;
 			}
 		case 0x9: return SNEVXVY;
 		case 0xA: return LDIADDR;
@@ -62,6 +67,7 @@ enum opcode decode(union Instruction instruction)
 			{
 				case 0x9E: return SKPVX;
 				case 0xA1: return SKNPVX;
+				default: return NOP;
 			}
 		case 0xF: switch(instruction.lowByte)
 			{
@@ -74,10 +80,465 @@ enum opcode decode(union Instruction instruction)
 				case 0x33: return LDBVX;
 				case 0x55: return LDIVX;
 				case 0x65: return LDVXI;
+				default: return NOP;
 			}
 		default: return NOP;
 	}
 }
+
+const char * opcodeString(enum Opcode opcode)
+{
+	switch(opcode)
+	{
+		case CLS:
+			{
+				return "CLS";
+			}
+		case RET:
+			{
+				return "RET";
+			}
+		case JPADDR:
+			{
+				return "JPADDR";
+			}
+		case CALLADDR:
+			{
+				return "CALLADDR";
+			}
+		case SEVXBYTE:
+			{
+				return "SEVXBYTE";
+			}
+		case SNEVXBYTE:
+			{
+				return "SNEVXBYTE";
+			}
+		case SEVXVY:
+			{
+				return "SEVXVY";
+			}
+		case LDVXBYTE:
+			{
+				return "LDVXBYTE";
+			}
+		case ADDVXBYTE:
+			{
+				return "ADDVXBYTE";
+			}
+		case LDVXVY:
+			{
+				return "LDVXVY";
+			}
+		case ORVXVY:
+			{
+				return "ORVXVY";
+			}
+		case ANDVXVY:
+			{
+				return "ANDVXVY";
+			}
+		case XORVXVY:
+			{
+				return "XORVXVY";
+			}
+		case ADDVXVY:
+			{
+				return "ADDVXVY";
+			}
+		case SUBVXVY:
+			{
+				return "SUBVXVY";
+			}
+		case SHRVXVY:
+			{
+				return "SHRVXVY";
+			}
+		case SUBNVXVY:
+			{
+				return "SUBNVXVY";
+			}
+		case SHLVXVY:
+			{
+				return "SHLVXVY";
+			}
+		case SNEVXVY:
+			{
+				return "SNEVXVY";
+			}
+		case LDIADDR:
+			{
+				return "LDIADDR";
+			}
+		case JPV0ADDR:
+			{
+				return "JPV0ADDR";
+			}
+		case RNDVXBYTE:
+			{
+				return "RNDVXBYTE";
+			}
+		case DRWVXVYNIBBLE:
+			{
+				return "DRWVXVYNIBBLE";
+			}
+		case SKPVX:
+			{
+				return "SKPVX";
+			}
+		case SKNPVX:
+			{
+				return "SKNPVX";
+			}
+		case LDVXDT:
+			{
+				return "LDVXDT";
+			}
+		case LDVXK:
+			{
+				return "LDVXK";
+			}
+		case LDDTVX:
+			{
+				return "LDDTVX";
+			}
+		case LDSTVX:
+			{
+				return "LDSTVX";
+			}
+		case ADDIVX:
+			{
+				return "ADDIVX";
+			}
+		case LDFVX:
+			{
+				return "LDFVX";
+			}
+		case LDBVX:
+			{
+				return "LDBVX";
+			}
+		case LDIVX:
+			{
+				return "LDIVX";
+			}
+		case LDVXI:
+			{
+				return "LDVXI";
+			}
+		case NOP:
+			{
+				return "NOP";
+			}
+	}
+}
+
+void getParameters(union Instruction instruction, char * buffer)
+{
+	//sprintf(buffer, "");
+	strcpy(buffer, "                 ");
+	switch(decode(instruction))
+	{
+		case CLS:
+			{
+				break;
+			}
+		case RET:
+			{
+				break;
+			}
+		case JPADDR:
+			{
+				//sprintf(buffer, "0x%03X", instruction.bottom12Bits);
+				break;
+			}
+		case CALLADDR:
+			{
+				break;
+			}
+		case SEVXBYTE:
+			{
+				/*
+				unsigned char x = instruction.nibble2;
+				unsigned char kk = instruction.lowByte;
+				sprintf(buffer, "v%X    0x%02X", x, kk);
+				*/
+				break;
+			}
+		case SNEVXBYTE:
+			{
+				break;
+			}
+		case SEVXVY:
+			{
+				break;
+			}
+		case LDVXBYTE:
+			{
+				break;
+			}
+		case ADDVXBYTE:
+			{
+				break;
+			}
+		case LDVXVY:
+			{
+				break;
+			}
+		case ORVXVY:
+			{
+				break;
+			}
+		case ANDVXVY:
+			{
+				break;
+			}
+		case XORVXVY:
+			{
+				break;
+			}
+		case ADDVXVY:
+			{
+				break;
+			}
+		case SUBVXVY:
+			{
+				break;
+			}
+		case SHRVXVY:
+			{
+				break;
+			}
+		case SUBNVXVY:
+			{
+				break;
+			}
+		case SHLVXVY:
+			{
+				break;
+			}
+		case SNEVXVY:
+			{
+				break;
+			}
+		case LDIADDR:
+			{
+				break;
+			}
+		case JPV0ADDR:
+			{
+				break;
+			}
+		case RNDVXBYTE:
+			{
+				break;
+			}
+		case DRWVXVYNIBBLE:
+			{
+				unsigned char x = instruction.nibble2;
+				unsigned char y = instruction.nibble1;
+				unsigned char n = instruction.nibble0;
+				sprintf(buffer, "v%X    v%X    0x%02X", x, y, n);
+				break;
+			}
+		case SKPVX:
+			{
+				break;
+			}
+		case SKNPVX:
+			{
+				break;
+			}
+		case LDVXDT:
+			{
+				break;
+			}
+		case LDVXK:
+			{
+				break;
+			}
+		case LDDTVX:
+			{
+				break;
+			}
+		case LDSTVX:
+			{
+				break;
+			}
+		case ADDIVX:
+			{
+				break;
+			}
+		case LDFVX:
+			{
+				break;
+			}
+		case LDBVX:
+			{
+				break;
+			}
+		case LDIVX:
+			{
+				break;
+			}
+		case LDVXI:
+			{
+				break;
+			}
+		case NOP:
+			{
+				break;
+			}
+	}
+}
+
+/*
+	Big switch statement for each instruction
+	switch(opcode)
+	{
+		case CLS:
+			{
+				break;
+			}
+		case RET:
+			{
+				break;
+			}
+		case JPADDR:
+			{
+				break;
+			}
+		case CALLADDR:
+			{
+				break;
+			}
+		case SEVXBYTE:
+			{
+				break;
+			}
+		case SNEVXBYTE:
+			{
+				break;
+			}
+		case SEVXVY:
+			{
+				break;
+			}
+		case LDVXBYTE:
+			{
+				break;
+			}
+		case ADDVXBYTE:
+			{
+				break;
+			}
+		case LDVXVY:
+			{
+				break;
+			}
+		case ORVXVY:
+			{
+				break;
+			}
+		case ANDVXVY:
+			{
+				break;
+			}
+		case XORVXVY:
+			{
+				break;
+			}
+		case ADDVXVY:
+			{
+				break;
+			}
+		case SUBVXVY:
+			{
+				break;
+			}
+		case SHRVXVY:
+			{
+				break;
+			}
+		case SUBNVXVY:
+			{
+				break;
+			}
+		case SHLVXVY:
+			{
+				break;
+			}
+		case SNEVXVY:
+			{
+				break;
+			}
+		case LDIADDR:
+			{
+				break;
+			}
+		case JPV0ADDR:
+			{
+				break;
+			}
+		case RNDVXBYTE:
+			{
+				break;
+			}
+		case DRWVXVYNIBBLE:
+			{
+				break;
+			}
+		case SKPVX:
+			{
+				break;
+			}
+		case SKNPVX:
+			{
+				break;
+			}
+		case LDVXDT:
+			{
+				break;
+			}
+		case LDVXK:
+			{
+				break;
+			}
+		case LDDTVX:
+			{
+				break;
+			}
+		case LDSTVX:
+			{
+				break;
+			}
+		case ADDIVX:
+			{
+				break;
+			}
+		case LDFVX:
+			{
+				break;
+			}
+		case LDBVX:
+			{
+				break;
+			}
+		case LDIVX:
+			{
+				break;
+			}
+		case LDVXI:
+			{
+				break;
+			}
+		case NOP:
+			{
+				break;
+			}
+	}
+*/
+
 
 /*
 int main()
