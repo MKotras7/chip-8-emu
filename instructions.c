@@ -21,10 +21,10 @@ union Instruction
 	};
 };
 
-union Instruction getInstruction(unsigned short pc, char memory[])
+union Instruction getInstruction(unsigned short pc, unsigned char *memory)
 {
 	union Instruction instruction;
-	instruction.whole = (((short)memory[pc]) << 8) + (short)memory[pc+1];
+	instruction.whole = ((((unsigned short)memory[pc])) << 8) + ((unsigned short)memory[pc+1]);
 	return instruction;
 }
 
@@ -240,97 +240,50 @@ void getParameters(union Instruction instruction, char * buffer)
 	switch(decode(instruction))
 	{
 		case CLS:
-			{
-				break;
-			}
 		case RET:
 			{
 				break;
 			}
 		case JPADDR:
-			{
-				//sprintf(buffer, "0x%03X", instruction.bottom12Bits);
-				break;
-			}
 		case CALLADDR:
+		case LDIADDR:
+		case JPV0ADDR:
 			{
+				sprintf(buffer, "0x%03X", instruction.bottom12Bits);
 				break;
 			}
 		case SEVXBYTE:
+		case SNEVXBYTE:
+		case LDVXBYTE:
+		case ADDVXBYTE:
+		case RNDVXBYTE:
 			{
-				/*
 				unsigned char x = instruction.nibble2;
 				unsigned char kk = instruction.lowByte;
 				sprintf(buffer, "v%X    0x%02X", x, kk);
-				*/
-				break;
-			}
-		case SNEVXBYTE:
-			{
 				break;
 			}
 		case SEVXVY:
-			{
-				break;
-			}
-		case LDVXBYTE:
-			{
-				break;
-			}
-		case ADDVXBYTE:
-			{
-				break;
-			}
 		case LDVXVY:
-			{
-				break;
-			}
 		case ORVXVY:
-			{
-				break;
-			}
 		case ANDVXVY:
-			{
-				break;
-			}
 		case XORVXVY:
-			{
-				break;
-			}
 		case ADDVXVY:
-			{
-				break;
-			}
 		case SUBVXVY:
+		case SUBNVXVY:
+		case SNEVXVY:
 			{
+				unsigned char x = instruction.nibble2;
+				unsigned char y = instruction.nibble1;
+				sprintf(buffer, "v%X    v%X", x, y);
 				break;
 			}
 		case SHRVXVY:
-			{
-				break;
-			}
-		case SUBNVXVY:
-			{
-				break;
-			}
 		case SHLVXVY:
 			{
-				break;
-			}
-		case SNEVXVY:
-			{
-				break;
-			}
-		case LDIADDR:
-			{
-				break;
-			}
-		case JPV0ADDR:
-			{
-				break;
-			}
-		case RNDVXBYTE:
-			{
+				unsigned char x = instruction.nibble2;
+				unsigned char y = instruction.nibble1;
+				sprintf(buffer, "v%X    {v%X}", x, y);
 				break;
 			}
 		case DRWVXVYNIBBLE:
@@ -342,47 +295,19 @@ void getParameters(union Instruction instruction, char * buffer)
 				break;
 			}
 		case SKPVX:
-			{
-				break;
-			}
 		case SKNPVX:
-			{
-				break;
-			}
 		case LDVXDT:
-			{
-				break;
-			}
 		case LDVXK:
-			{
-				break;
-			}
 		case LDDTVX:
-			{
-				break;
-			}
 		case LDSTVX:
-			{
-				break;
-			}
 		case ADDIVX:
-			{
-				break;
-			}
 		case LDFVX:
-			{
-				break;
-			}
 		case LDBVX:
-			{
-				break;
-			}
 		case LDIVX:
-			{
-				break;
-			}
 		case LDVXI:
 			{
+				unsigned char x = instruction.nibble2;
+				sprintf(buffer, "v%X", x);
 				break;
 			}
 		case NOP:

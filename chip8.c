@@ -120,6 +120,46 @@ char * getRegister(short registerID)
 	}
 }
 
+//Draws a box out of # symbols with a title,
+//Does not refresh the display.
+void drawBox(int x, int y, int width, int height, char title[])
+{
+	int titleLength = strlen(title);
+	move(y, x);
+	printw("#%s", title);
+	for(int i = 0; i < width - titleLength - 1; i++)
+	{
+		addch('#');
+	}
+	
+	for(int i = 1; i < height - 1; i++)
+	{
+		move(y + i, x); 
+		addch('#');
+		move(y + i, x + width - 1); 
+		addch('#');
+	}
+	move(y + height - 1, x);
+	for(int i = 0; i < width; i++)
+	{
+		addch('#');
+	}
+}
+
+//Fills the screen with blanks over the bounds, inclusive of both ends
+//Does not refresh the display
+void clearArea(int startX, int startY, int endX, int endY)
+{
+	for(int y = startY; y <= endY; y++)
+	{
+		move(y, startX);
+		for(int x = startX; x <= endX; x++)
+		{
+			addch(' ');
+		}
+	}
+}
+
 int main(int argc, char *argv[])
 {
     WINDOW *win = initscr();
@@ -255,24 +295,26 @@ int main(int argc, char *argv[])
 	fread(memory + 0x200, 1, 0xFFF - 0x200, fileptr);
 	fclose(fileptr);
 	
-	endwin();
-	for(int i = 0; i < 0xFFF; i+=2)
-	{
-		union Instruction rowInstruction = getInstruction(i, memory);
-		printf("pc: 0x%03X | 0x%04X\n", i, rowInstruction.whole);
-	}
-	win = initscr();
+	//Setup the instruction box
+	int instructionBoxX = 64;
+	int instructionBoxY = 0;
+	int instructionBoxWidth = 48; //External width
+	int instructionBoxHeight = 14;
+	int instructionBoxDownshift = 2;
+	drawBox(instructionBoxX, instructionBoxY, instructionBoxWidth, instructionBoxHeight, "INSTRUCTIONS");
 	
-	//Setup the screen
-	move(0, 64);
-	printw("##############INSTRUCTIONS###############");
-	move(1,64); addch('#'); move(1,104); addch('#');
-	move(2,64); addch('#'); move(2,104); addch('#');
-	move(3,64); addch('#' | A_REVERSE); move(3,104); addch('#' | A_REVERSE);
-	move(4,64); addch('#'); move(4,104); addch('#');
-	move(5,64); addch('#'); move(5,104); addch('#');
-	move(6, 64);
-	printw("#########################################");
+	//Add the highlight
+	move(instructionBoxY + instructionBoxDownshift + 1, instructionBoxX);
+	addch('#' | A_REVERSE);
+	move(instructionBoxY + instructionBoxDownshift + 1, instructionBoxX + instructionBoxWidth - 1);
+	addch('#' | A_REVERSE);
+	
+	int opcodeX = 64;
+	int opcodeY = 13;
+	int opcodeWidth = 48;
+	int opcodeHeight = 8;
+	
+	drawBox(opcodeX, opcodeY, opcodeWidth, opcodeHeight, "REGISTERS");
 	
 	int stepping = 1;
 	
@@ -283,17 +325,44 @@ int main(int argc, char *argv[])
 	{
 		union Instruction instruction = getInstruction(pc, memory);
 		enum Opcode opcode = decode(instruction);
-		int downShift = 2;
-		for(int i = 0; i < 5; i++)
+		
+		clearArea(opcodeX + 1, opcodeY + 1, opcodeX + opcodeWidth - 2, opcodeY + opcodeHeight - 2);
+		for(int x = 0; x < 4; x++)
 		{
-			unsigned short rowPC = pc - (downShift * 2) + (2*i);
+			for(int y = 0; y < 4; y++)
+			{
+				int registerID = y + (x*4);
+				move(opcodeY + 1 + y, opcodeX + 2 + (12*x));
+				unsigned char *vXptr = getRegister(registerID);
+				
+				printw("v%X: 0x%02X", registerID, *vXptr);
+			}
+		}
+		
+		move(opcodeY + 1 + 4, opcodeX + 2);
+		printw("I: 0x%03X", instructionRegister);
+		move(opcodeY + 1 + 4, opcodeX + opcodeWidth - 2 - 8);
+		printw("DT: 0x%02X", delayTimer);
+		move(opcodeY + 1 + 5, opcodeX + opcodeWidth - 2 - 8);
+		printw("ST: 0x%02X", soundTimer);
+		move(opcodeY + 1 + 4, opcodeX + 2 + 12);
+		printw("PC: 0x%03X", pc);
+		move(opcodeY + 1 + 4, opcodeX + 2 + 24);
+		printw("SP: 0x%02X", sp);
+		
+		for(int i = 0; i < instructionBoxHeight - 2; i++)
+		{
+			unsigned short rowPC = pc - (instructionBoxDownshift * 2) + (2*i);
 			
-			move(1 + i, 66);
+			move(instructionBoxY + i + 1, 66);
 			//This is used for under/overflow checking. There is probably a much better way!
 			int intPC = ((int)rowPC) - 4 + (2*i); 
 			if(intPC < 0 || intPC > 0xFFF)
 			{ //If out of bounds, just draw a blank
-				printw("                                    ");
+				for(int i = 0; i < instructionBoxWidth; i++)
+				{
+					addch(' ');
+				}
 			}
 			else
 			{
@@ -305,7 +374,7 @@ int main(int argc, char *argv[])
 				
 				printw("0x%03X %-13s %-17s", rowPC, opcodeString(rowOpcode), opcodeNameBuffer);
 				
-				move(1+i, 66+37+5);
+				printw(" ");
 				printw("0x%04X", rowInstruction.whole);
 			}
 		}
