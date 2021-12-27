@@ -26,3 +26,7 @@ When the emulator starts, it will be in a 'stepping' mode, when this is active, 
  - If anything else is pressed, the emulator will execute the current instruction and once complete will pause until the next input.
 ## Developing for my emulator
 Unlike some CHIP-8 implementations, when the program counter runs off 0xFFF, it will halt execution and will wait for input to close the screen and return to the terminal.
+## Sources and other links
+ - Cowgod's Chip-8 Technical Reference: devernay.free.fr/hacks/chip8/C8TECH10.HTM
+ - CHIP-8 wikipedia: https://en.wikipedia.org/wiki/CHIP-8
+
