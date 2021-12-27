@@ -5,9 +5,32 @@
 #include<time.h>
 #include "instructions.c"
 
+//Some constants
+const int inputBoxX = 64;
+const int inputBoxY = 20;
+
+const int stackBoxX = 69;
+const int stackBoxY = 20;
+
+const int opcodeX = 64;
+const int opcodeY = 13;
+const int opcodeWidth = 48;
+const int opcodeHeight = 8;
+
+const int inputBoxWidth = 6;
+const int inputBoxHeight = 6;
+
+const int stackBoxWidth = 43;
+const int stackBoxHeight = 6;
+
+//Emulator specific variable
+int stepMode = 1;
+
 //Data storage
 unsigned char memory[4096];
 unsigned short stack[16];
+//One bit for whether or not an input is currently down
+unsigned short inputs;
 //General purpose registers
 unsigned char v0;
 unsigned char v1;
@@ -54,45 +77,104 @@ unsigned char keyToKeypad(char c)
 		case 'x': return 0x0;
 		case 'c': return 0xB;
 		case 'v': return 0xF;
-		default: return 0x0;
+		default: return 0xF1;
 	}
 }
 
-//If this returns ERR, it means no keys have been pressed.
-//Otherwise, the returned value will be the most recently pressed key.
-char getMostRecentChar()
+unsigned char keyToOffsetX(char c)
+{
+	switch(c)
+	{
+		case 0x1:
+		case 0x4:
+		case 0x7:
+		case 0xA: return 0;
+		case 0x2:
+		case 0x5:
+		case 0x8:
+		case 0x0: return 1;
+		case 0x3:
+		case 0x6:
+		case 0x9: 
+		case 0xB: return 2;
+		case 0xC:
+		case 0xD:
+		case 0xE:
+		case 0xF: return 3;
+		default: return 0x00;
+	}
+}
+unsigned char keyToOffsetY(char c)
+{
+	switch(c)
+	{
+		case 0x1:
+		case 0x2:
+		case 0x3:
+		case 0xC: return 0;
+		case 0x4:
+		case 0x5:
+		case 0x6:
+		case 0xD: return 1;
+		case 0x7:
+		case 0x8:
+		case 0x9: 
+		case 0xE: return 2;
+		case 0xA:
+		case 0x0:
+		case 0xB:
+		case 0xF: return 3;
+		default: return 0x00;
+	}
+}
+
+//Applies the inputs from the current input buffer
+//Also fixes the debug display
+//Does not redraw the screen
+void applyInputs()
 {
 	timeout(0);
-	char mostRecentchar = ERR;
+	char mostRecentChar = ERR;
 	char getchChar;
 	while( (getchChar = getch()) != ERR)
 	{
-		mostRecentchar = getchChar;
+		//Convert the actual key pressed to the emulator-key [0x0,0xF]
+		char key = keyToKeypad(getchChar);
+		
+		if(getchChar == 'p')
+		{
+			stepMode = 1;
+		}
+		
+		//If this key was valid
+		if(key != 0xF1)
+		{
+			//Flip the bit corresponding to the one pressed
+			inputs ^= 1 << key;
+			move(inputBoxY + 1 + (keyToOffsetY(key)*1), inputBoxX + 1 + (keyToOffsetX(key)*1));
+			if((inputs >> key) & 1)
+			{
+				addch('#' | A_REVERSE);
+			}
+			else
+			{
+				addch(' ');
+			}
+		}
 	}
-	return mostRecentchar;
 }
 
-/*
-unsigned short getInstruction(short pc)
+//Draws the relavent information to the stack box
+//Does not redraw the screen
+void updateStackBox()
 {
-	return (((short)memory[pc]) << 8) + (short)memory[pc+1];
-}
-*/
-
-unsigned short getLower12bit(short value)
-{
-	return value & 0x0FFF;
-}
-
-unsigned char getLower8bit(short value)
-{
-	return value & 0xFF;
-}
-
-//gets the nth nibble, with 0 being the least significant nibble. 
-unsigned short getNibble(short value, char n)
-{
-	return (value & (0xF << (n*4))) >> (n*4);
+	for(int i = 0; i < 16; i++)
+	{
+		int x = i / 4;
+		int y = i % 4;
+		move(stackBoxY + y + 1, stackBoxX + 2 + (10*x));
+		printw("%X: 0x%04X", i, stack[i]);
+	}
 }
 
 char * getRegister(short registerID)
@@ -181,7 +263,7 @@ int main(int argc, char *argv[])
     noecho();
 	cbreak();
     srand(time(NULL));
-    //srand(0);
+	nodelay(stdscr, TRUE);
 	
 	printw("The input for the game is 1234QWERASDFZXCV\n");
 	printw("Press any key to begin. . .");
@@ -319,7 +401,7 @@ int main(int argc, char *argv[])
 	int instructionBoxY = 0;
 	int instructionBoxWidth = 48; //External width
 	int instructionBoxHeight = 14;
-	int instructionBoxDownshift = 2;
+	int instructionBoxDownshift = 7;
 	drawBox(instructionBoxX, instructionBoxY, instructionBoxWidth, instructionBoxHeight, "INSTRUCTIONS");
 	
 	//Add the highlight
@@ -328,23 +410,22 @@ int main(int argc, char *argv[])
 	move(instructionBoxY + instructionBoxDownshift + 1, instructionBoxX + instructionBoxWidth - 1);
 	addch('#' | A_REVERSE);
 	
-	int opcodeX = 64;
-	int opcodeY = 13;
-	int opcodeWidth = 48;
-	int opcodeHeight = 8;
-	
+	//Setup the input box
 	drawBox(opcodeX, opcodeY, opcodeWidth, opcodeHeight, "REGISTERS");
+	drawBox(inputBoxX, inputBoxY, inputBoxWidth, inputBoxHeight, "INPT");
+	drawBox(stackBoxX, stackBoxY, stackBoxWidth, stackBoxHeight, "STACK");
 	
-	int stepping = 1;
+	stepMode = 1;
 	
 	pc = 0x200;
 	//Increment pc starts at true, some functions might set it to false.
 	int incrementPC = 1;
 	while(pc <= 0xFFF)
 	{
-		union Instruction instruction = getInstruction(pc, memory);
-		enum Opcode opcode = decode(instruction);
+		//clearArea(stackBoxX + 1, stackBoxY + 1, stackBoxX + stackBoxWidth - 2, stackBoxY + stackBoxHeight - 2);
+		updateStackBox();
 		
+		clearArea(opcodeX + 1, opcodeY + 1, opcodeX + opcodeWidth - 2, opcodeY + opcodeHeight - 2);
 		clearArea(opcodeX + 1, opcodeY + 1, opcodeX + opcodeWidth - 2, opcodeY + opcodeHeight - 2);
 		for(int x = 0; x < 4; x++)
 		{
@@ -369,57 +450,62 @@ int main(int argc, char *argv[])
 		move(opcodeY + 1 + 4, opcodeX + 2 + 24);
 		printw("SP: 0x%02X", sp);
 		
+		//Filling the instructions box with spaces fixes the game window flickering
+		for(int i = 0; i < instructionBoxHeight; i++)
+		{
+			move(instructionBoxY + i, instructionBoxX);
+			printw("#");
+			
+			
+			move(instructionBoxY + i, instructionBoxX + instructionBoxWidth - 1);
+			printw("#");
+		}
+		move(instructionBoxY + instructionBoxDownshift + 1, instructionBoxX);
+		addch('#' | A_REVERSE);
+		move(instructionBoxY + instructionBoxDownshift + 1, instructionBoxX + instructionBoxWidth - 1);
+		addch('#' | A_REVERSE);
+		refresh();
+		
 		for(int i = 0; i < instructionBoxHeight - 2; i++)
 		{
 			unsigned short rowPC = pc - (instructionBoxDownshift * 2) + (2*i);
 			
-			move(instructionBoxY + i + 1, 66);
 			//This is used for under/overflow checking. There is probably a much better way!
+			/*
 			int intPC = ((int)rowPC) - 4 + (2*i); 
 			if(intPC < 0 || intPC > 0xFFF)
 			{ //If out of bounds, just draw a blank
-				for(int i = 0; i < instructionBoxWidth; i++)
-				{
-					addch(' ');
-				}
+				
 			}
 			else
+			*/
 			{
+				
 				union Instruction rowInstruction = getInstruction(rowPC, memory);
 				enum Opcode rowOpcode = decode(rowInstruction);
 				
 				char opcodeNameBuffer[18];
 				getParameters(rowInstruction, opcodeNameBuffer);
+				move(instructionBoxY + i + 1, opcodeX + 2);
 				
 				printw("0x%03X %-13s %-17s", rowPC, opcodeString(rowOpcode), opcodeNameBuffer);
 				
+				//printw("%d", rand() % 10);
 				printw(" ");
 				printw("0x%04X", rowInstruction.whole);
+				refresh();
 			}
 		}
-		refresh();
-		
-		//Grab the most recently pressed key
-		char mostRecentCharFromBuffer = getMostRecentChar();
-		if(mostRecentCharFromBuffer != ERR)
-		{
-			mostRecentChar = mostRecentCharFromBuffer;
-		}
-		
-		if(!stepping && (mostRecentChar == 'p'))
-		{
-			stepping = 1;
-			mostRecentChar = ERR;
-		}
-		
-		if(stepping)
+		applyInputs();
+		//Now, if stepping is enabled, wait on user input.
+		if(stepMode)
 		{
 			//Wait for input
 			timeout(-1);
 			char nextChar = getch();
 			if(nextChar == 'p')
-			{ //Hitting P will run the game at full speed, can't be undone.
-				stepping = 0;
+			{ //Hitting P will run the game at full speed
+				stepMode = 0;
 			}
 			else if(nextChar == 'o')
 			{ //Hitting O will continue with a delay so you can get inputs in.
@@ -427,26 +513,20 @@ int main(int argc, char *argv[])
 				sleepTime.tv_sec = 0;
 				sleepTime.tv_nsec = 250000000;
 				nanosleep(&sleepTime, &sleepTime);
-			} //Hitting anything else will do nothing
-			else
-			{
-				
-			}
+				//After the sleep, apply any buttons the user may have pressed.
+				applyInputs();
+			} 
+			//Hitting anything else will do nothing
 		}
 		
+		//Update the timer registers
 		struct timespec newTime;
 		clock_gettime(CLOCK_REALTIME, &newTime);
 		long int totalNewNanos = (((long int)newTime.tv_sec * ((long int) 1000000000)) + newTime.tv_nsec);
 		long int totalLastNanos = (((long int)lastTime.tv_sec * ((long int) 1000000000)) + lastTime.tv_nsec);
 		long int totalNanoDifference = totalNewNanos - totalLastNanos;
 		
-		//move(20, 20);
-		//printw("%d --- %d", lastTime.tv_nsec, newTime.tv_nsec);
-		
-		//BUG IN PONG AT 0X232
-		
 		int decrementCount = (totalNanoDifference / 16666667);
-		//int decrementCount = (totalNanoDifference / 16666667);
 		if(delayTimer < decrementCount)
 		{
 			delayTimer = 0;
@@ -470,15 +550,18 @@ int main(int argc, char *argv[])
 			lastTime = newTime;
 		}
 		
-		//unsigned short instruction = getInstruction(pc);
+		//Grab the current instruction
+		union Instruction instruction = getInstruction(pc, memory);
+		enum Opcode opcode = decode(instruction);
 		
+		//List of all the instructions for reference, defined in instructions.c
 		//{CLS, RET, JPADDR, CALLADDR, SEVXBYTE, SNEVXBYTE, SEVXVY, LDVXBYTE, ADDVXBYTE, LDVXVY, ORVXVY, ANDVXVY, XORVXVY, ADDVXVY, SUBVXVY, SHRVXVY, SUBNVXVY, SHLVXVY, SNEVXVY, LDIADDR, JPV0ADDR, RNDVXBYTE, DRWVXVYNIBBLE, SKPVX, SKNPVX, LDVXDT, LDVXK, LDDTVX, LDSTVX, ADDIVX, LDFVX, LDBVX, LDIVX, LDVXI, NOP}
 		switch(decode(instruction))
 		{
 			case CLS:
 			{
 				clearArea(0, 0, 63, 31);
-				refresh();
+				//refresh();
 				//erase();
 				break;
 			}
@@ -729,48 +812,32 @@ int main(int argc, char *argv[])
 						spriteLine >>= 1;
 					}
 				}
-				refresh();
+				//refresh();
 				vF = anyChanged;
 				break;
 			}
 			case SKPVX:
 			{
-				char mostRecentCharFromBuffer = getMostRecentChar();
-				if(mostRecentCharFromBuffer != ERR)
-				{
-					mostRecentChar = mostRecentCharFromBuffer;
-				}
-				unsigned char key = keyToKeypad(mostRecentChar);
-				//unsigned char key = keyToKeypad(getch());
-				
 				unsigned char x = instruction.nibble2;
 				unsigned char *vXptr = getRegister(x);
-				if(key == *vXptr)
+				
+				if((inputs >> (*vXptr)) & 1)
 				{
 					pc += 2;
 				}
-				//This should definitely be removed in the future, but for now it is how I am handling holding keys down which will help handle multiple key checks in a row.
-				//mostRecentChar = ERR;
+				
 				break;
 			}
 			case SKNPVX:
 			{
-				char mostRecentCharFromBuffer = getMostRecentChar();
-				if(mostRecentCharFromBuffer != ERR)
-				{
-					mostRecentChar = mostRecentCharFromBuffer;
-				}
-				unsigned char key = keyToKeypad(mostRecentChar);
-				//unsigned char key = keyToKeypad(getch());
-				
 				unsigned char x = instruction.nibble2;
 				unsigned char *vXptr = getRegister(x);
-				move(20, 20);
-				if(key != *vXptr)
+				
+				if(!((inputs >> (*vXptr)) & 1))
 				{
 					pc += 2;
 				}
-				//mostRecentChar = ERR;
+				
 				break;
 			}
 			case LDVXDT:
@@ -782,18 +849,36 @@ int main(int argc, char *argv[])
 			}
 			case LDVXK:
 			{
-				//Set most recent char to empty, also clear the buffer.
-				mostRecentChar = ERR;
-				getMostRecentChar();
+				//Load the most recent inputs pressed before this instruction started
+				//also clear the input buffer.
+				applyInputs();
 				
-				//notimeout(win, 1);
 				timeout(-1);
-				char key = (char) getch();
-				//unsigned char key = 0;
+				
+				int changedToZero = 0;
+				char keyPressed = 0;
+				while(!changedToZero)
+				{ //Loop while a key has not been pressed DOWN
+					//Grab an input
+					char key = (char) getch();
+					//Convert to emulator keypad
+					char numKey = keyToKeypad(key);
+					//See if the value of this input is currently 0 (not pressed)
+					if(!((inputs >> numKey) & 1))
+					{ //We are pressing a key down
+						changedToZero = 1;
+						keyPressed = numKey;
+					}
+					
+					//Flip the bit of the key that was just pressed
+					inputs ^= (1 << numKey);
+					
+				}
+				
 				unsigned char x = instruction.nibble2;
 				unsigned char *vXptr = getRegister(x);
 				
-				*vXptr = keyToKeypad(key);
+				*vXptr = keyPressed;
 				break;
 			}
 			case LDDTVX:
@@ -868,8 +953,8 @@ int main(int argc, char *argv[])
 	}
 	move(33, 0);
 	printw("End of game. Press any key to continue.");
-	//Clear the input buffer
-	getMostRecentChar();
+	//Apply the inputs one more time, to clear the input buffer.
+	applyInputs();
 	timeout(-1);
 	getch();
     endwin();
