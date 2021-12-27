@@ -1,5 +1,5 @@
 # # chip-8-emu
-A [CHIP-8](https://en.wikipedia.org/wiki/CHIP-8) emulator written in C using the `ncurses` API for the display in a terminal.
+A work in progress [CHIP-8](https://en.wikipedia.org/wiki/CHIP-8) emulator written in C using the `ncurses` API for the display in a terminal.
  gcc ./chip8.c -lncurses && ./a.out ./ROMS/test_opcode.ch8 Input keys are 1234 QWER ASDF ZXCV
 
 Hi! I'm your first Markdown file in **StackEdit**. If you want to learn about StackEdit, you can read me. If you want to play with Markdown, you can edit me. Once you have finished with me, you can create new files by opening the **file explorer** on the left corner of the navigation bar.
